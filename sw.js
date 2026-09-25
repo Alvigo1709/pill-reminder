@@ -8,7 +8,7 @@
  */
 
 // Subir este número al cambiar SHELL: fuerza a descartar la caché anterior.
-const CACHE = 'pilltime-v5';
+const CACHE = 'pilltime-v6';
 
 // config.js queda FUERA a propósito: es el archivo que decide si la app habla
 // con el backend o con localStorage. Una versión vieja no rompe nada visible,
@@ -127,8 +127,13 @@ self.addEventListener('push', ev => {
     self.registration.showNotification(datos.titulo, {
       body: datos.cuerpo,
       tag: datos.tag || 'pilltime-push',
-      renotify: true,
-      requireInteraction: true,
+      renotify: true,              // vuelve a sonar aunque reemplace a una anterior
+      requireInteraction: true,    // no desaparece sola: espera respuesta
+      // Explícito a propósito. El valor por defecto ya es false, pero dejarlo
+      // escrito documenta la intención. Ojo: desde la web solo se puede pedir
+      // que la notificación NO sea silenciosa; si suena o no lo decide la
+      // importancia del canal de Android, que la página no puede cambiar.
+      silent: false,
       icon: './icon.svg',
       badge: './icon.svg',
       vibrate: [300, 120, 300, 120, 300],
