@@ -11,7 +11,7 @@
  */
 
 // Subir este número al cambiar SHELL: fuerza a descartar la caché anterior.
-const CACHE = 'pilltime-v3';
+const CACHE = 'pilltime-v4';
 
 // config.js queda FUERA a propósito: es el archivo que decide si la app habla
 // con el backend o con localStorage. Una versión vieja no rompe nada visible,

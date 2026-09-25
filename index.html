@@ -40,6 +40,21 @@
   </section>
 
 
+  <!-- ══════════ Reconexión silenciosa ══════════
+       Se muestra cuando ya sabemos quién es el usuario y solo hay que
+       renovar el token. Evita mandarlo al login por algo que se resuelve
+       solo en un par de segundos. -->
+  <section id="reconectando" class="recon" hidden>
+    <div class="recon__box">
+      <div class="recon__spinner"></div>
+      <p class="recon__texto">Reconectando<span id="reconNombre"></span>…</p>
+      <button class="btn btn--sm btn--ghost" id="reconManual" hidden>
+        Entrar con otra cuenta
+      </button>
+    </div>
+  </section>
+
+
   <!-- ══════════ Aplicación ══════════ -->
   <div id="app" class="app" hidden>
 
@@ -279,6 +294,22 @@
         <button class="btn btn--link" id="alarmOmitir">Omitir esta toma</button>
       </div>
       <p class="alarm__count" id="alarmCount"></p>
+    </div>
+  </div>
+
+  <!-- ══════════ Invitación a instalar ══════════
+       En Android y escritorio dispara el diálogo nativo del navegador.
+       En iPhone no existe ese diálogo, así que mostramos las instrucciones:
+       ahí instalar es obligatorio para recibir notificaciones. -->
+  <div class="instalar" id="instalarBanner" hidden>
+    <div class="instalar__icono">💊</div>
+    <div class="instalar__texto">
+      <strong id="instalarTitulo">Instala PillTime</strong>
+      <span id="instalarDetalle">Para que no se cierre la sesión y lleguen los recordatorios.</span>
+    </div>
+    <div class="instalar__acciones">
+      <button class="btn btn--sm btn--primary" id="instalarBtn">Instalar</button>
+      <button class="iconbtn" id="instalarCerrar" title="Ahora no">✕</button>
     </div>
   </div>
 

@@ -61,9 +61,15 @@
     $('#loginLocal').hidden = true;
     $('#loginGoogle').hidden = false;
 
+    // Si ya sabemos quién usó la app aquí, no le enseñamos el login: le
+    // mostramos que estamos reconectando mientras Google reemite el token.
+    const conocido = Auth.ultimoPerfil();
+    if (conocido) mostrarReconectando(conocido.nombre);
+
     try {
       await esperarGoogle();
     } catch (e) {
+      ocultarReconectando();
       return errorLogin('No cargó la librería de Google. Revisa tu conexión.');
     }
 
@@ -78,15 +84,60 @@
 
         try {
           usuario = await Store.login();
+          ocultarReconectando();
           await entrar();
         } catch (err) {
+          ocultarReconectando();
           Auth.salir();
           errorLogin(err.message);
         }
       });
     } catch (e) {
+      ocultarReconectando();
       errorLogin(e.message);
     }
+  }
+
+  /* ───────────────── reconexión silenciosa ───────────────── */
+
+  let temporizadorRecon = null;
+
+  /**
+   * Pantalla de espera mientras Google reemite el token.
+   *
+   * Un ID token dura una hora, así que expira constantemente durante el uso
+   * normal. Mandar al usuario al login cada vez sería absurdo cuando sabemos
+   * perfectamente quién es y la renovación suele tardar menos de un segundo.
+   *
+   * Si pasados unos segundos Google no responde —típico cuando hay varias
+   * cuentas abiertas y exige elegir— ofrecemos la salida manual.
+   */
+  function mostrarReconectando(nombre) {
+    $('#reconNombre').textContent = nombre ? ' como ' + nombre : '';
+    $('#reconManual').hidden = true;
+    $('#reconectando').hidden = false;
+    $('#login').hidden = true;
+
+    clearTimeout(temporizadorRecon);
+    temporizadorRecon = setTimeout(() => {
+      $('#reconManual').hidden = false;
+    }, 6000);
+  }
+
+  function ocultarReconectando() {
+    clearTimeout(temporizadorRecon);
+    $('#reconectando').hidden = true;
+  }
+
+  /** Abandona la reconexión y muestra el login de siempre. */
+  function reconexionManual() {
+    ocultarReconectando();
+    Auth.salir();
+    usuario = null;
+    $('#app').hidden = true;
+    $('#login').hidden = false;
+    $('#loginHint').textContent = 'Solo pueden entrar los correos autorizados.';
+    $('#loginHint').classList.remove('is-error');
   }
 
   /** La librería de Google carga con `async defer`: hay que esperarla. */
@@ -138,6 +189,7 @@
     });
 
     actualizarBotonNotif();
+    prepararInstalacion();
     await cargarConfigEnUI();
     await refrescar();
   }
@@ -187,6 +239,18 @@
    */
   function volverAlLogin(mensaje) {
     Scheduler.detener();
+
+    // Si sabemos quién era, intentamos reconectar antes de pedirle nada.
+    // Solo si Google no reemite en unos segundos aparece el login.
+    const conocido = Auth.ultimoPerfil && Auth.ultimoPerfil();
+    if (window.MODO_REMOTO && conocido) {
+      usuario = null;
+      $('#app').hidden = true;
+      mostrarReconectando(conocido.nombre);
+      Auth.renovar();
+      return;
+    }
+
     usuario = null;
     $('#app').hidden = true;
     $('#login').hidden = false;
@@ -600,6 +664,10 @@
       if (vistaActual === 'ajustes') pintarAjustes();
     });
 
+    $('#reconManual').addEventListener('click', reconexionManual);
+    $('#instalarBtn').addEventListener('click', lanzarInstalacion);
+    $('#instalarCerrar').addEventListener('click', () => ocultarBannerInstalar(true));
+
     $('#nuevoMedBtn').addEventListener('click', () => abrirModalMed());
     $('#medForm').addEventListener('submit', guardarMedicamento);
     $('#medVeces').addEventListener('change', e => pintarHorarios(e.target.value));
@@ -694,6 +762,78 @@
 
     // Primer gesto de la sesión: desbloquea el audio para que la alarma suene.
     document.addEventListener('click', () => Notify.desbloquearAudio(), { once: true });
+  }
+
+  /* ═══════════════════════ instalación como PWA ═══════════════════════ */
+
+  let eventoInstalar = null;
+  const CLAVE_INSTALAR = 'pilltime.instalarDescartado';
+
+  function esIOS() {
+    return /iphone|ipad|ipod/i.test(navigator.userAgent);
+  }
+
+  function yaInstalada() {
+    return window.matchMedia('(display-mode: standalone)').matches ||
+           navigator.standalone === true;
+  }
+
+  /**
+   * Invita a instalar la app en la pantalla de inicio.
+   *
+   * Vale la pena insistir por dos razones: una PWA instalada conserva la
+   * sesión mucho mejor que una pestaña suelta —los navegadores limpian esas
+   * con bastante agresividad—, y en iPhone es el único modo de recibir
+   * notificaciones.
+   *
+   * Chrome y Edge avisan con beforeinstallprompt y abren su propio diálogo.
+   * Safari no tiene nada equivalente, así que ahí toca explicar los pasos.
+   */
+  function prepararInstalacion() {
+    if (yaInstalada()) return;
+    try {
+      if (localStorage.getItem(CLAVE_INSTALAR) === 'si') return;
+    } catch (e) { /* sin almacenamiento: mostramos igual */ }
+
+    window.addEventListener('beforeinstallprompt', ev => {
+      ev.preventDefault();               // queremos elegir CUÁNDO mostrarlo
+      eventoInstalar = ev;
+      mostrarBannerInstalar(false);
+    });
+
+    // iOS nunca dispara ese evento; si es iPhone, mostramos instrucciones.
+    if (esIOS()) setTimeout(() => mostrarBannerInstalar(true), 4000);
+  }
+
+  function mostrarBannerInstalar(instruccionesIOS) {
+    if (yaInstalada() || !usuario) return;
+
+    if (instruccionesIOS) {
+      $('#instalarTitulo').textContent = 'Agrega PillTime a tu pantalla';
+      $('#instalarDetalle').textContent =
+        'Toca Compartir ⬆️ y luego "Agregar a pantalla de inicio". ' +
+        'En iPhone es obligatorio para recibir notificaciones.';
+      $('#instalarBtn').hidden = true;
+    } else {
+      $('#instalarBtn').hidden = false;
+    }
+
+    $('#instalarBanner').hidden = false;
+  }
+
+  function ocultarBannerInstalar(recordarlo) {
+    $('#instalarBanner').hidden = true;
+    if (!recordarlo) return;
+    try { localStorage.setItem(CLAVE_INSTALAR, 'si'); } catch (e) { /* da igual */ }
+  }
+
+  async function lanzarInstalacion() {
+    if (!eventoInstalar) return;
+    eventoInstalar.prompt();
+    const { outcome } = await eventoInstalar.userChoice;
+    eventoInstalar = null;
+    ocultarBannerInstalar(outcome === 'accepted');
+    if (outcome === 'accepted') toast('✓ PillTime instalada');
   }
 
   /* ═══════════════════════ helpers de presentación ═══════════════════════ */

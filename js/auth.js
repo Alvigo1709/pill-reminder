@@ -30,6 +30,7 @@
   var temporizador = null;      // renovación programada
 
   const CLAVE_SESION = 'pilltime.token';
+  const CLAVE_PERFIL = 'pilltime.perfil';
   const MARGEN_MS = 5 * 60 * 1000;   // renovar 5 min antes de expirar
 
   const Auth = {
@@ -130,6 +131,12 @@
 
       try {
         localStorage.setItem(CLAVE_SESION, jwt);
+        // El perfil se guarda aparte y SIN caducidad: el token muere en una
+        // hora, pero saber a quién pertenecía nos deja reconectar en silencio
+        // en vez de mandar al usuario a la pantalla de login.
+        localStorage.setItem(CLAVE_PERFIL, JSON.stringify({
+          email: perfil.email, nombre: perfil.nombre
+        }));
       } catch (e) { /* modo incógnito o almacenamiento lleno */ }
 
       Auth._programarRenovacion();
@@ -181,6 +188,20 @@
       return perfil;
     },
 
+    /**
+     * Quién usó la app por última vez en este dispositivo, aunque su token ya
+     * haya caducado. Sirve para reconectar sin preguntar nada.
+     */
+    ultimoPerfil: function () {
+      if (perfil) return perfil;
+      try {
+        const guardado = localStorage.getItem(CLAVE_PERFIL);
+        return guardado ? JSON.parse(guardado) : null;
+      } catch (e) {
+        return null;
+      }
+    },
+
     expirado: function () {
       return Boolean(token) && Boolean(perfil) && perfil.exp < Date.now() + 60000;
     },
@@ -192,6 +213,7 @@
       clearTimeout(temporizador);
       try {
         localStorage.removeItem(CLAVE_SESION);
+        localStorage.removeItem(CLAVE_PERFIL);     // olvidamos también la identidad
         sessionStorage.removeItem(CLAVE_SESION);   // restos de la versión anterior
         if (global.google && google.accounts && google.accounts.id) {
           google.accounts.id.disableAutoSelect();
