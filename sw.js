@@ -1,0 +1,100 @@
+/**
+ * sw.js — Service Worker.
+ *
+ * Hace dos cosas:
+ *   1. Cachea el app shell para que la PWA abra sin conexión.
+ *   2. Atiende los clicks en los botones de la notificación ("Ya la tomé" /
+ *      "Posponer") y se los reenvía a la página abierta.
+ *
+ * Cuando la app se despliegue con Web Push real (vía OneSignal o FCM), aquí
+ * se agrega el listener 'push' — el resto de la lógica ya está lista.
+ */
+
+const CACHE = 'pilltime-v1';
+const SHELL = [
+  './',
+  './index.html',
+  './css/styles.css',
+  './js/store.js',
+  './js/notify.js',
+  './js/scheduler.js',
+  './js/app.js',
+  './manifest.json',
+  './icon.svg'
+];
+
+self.addEventListener('install', ev => {
+  ev.waitUntil(
+    caches.open(CACHE)
+      .then(c => c.addAll(SHELL))
+      .then(() => self.skipWaiting())
+  );
+});
+
+self.addEventListener('activate', ev => {
+  ev.waitUntil(
+    caches.keys()
+      .then(claves => Promise.all(claves.filter(k => k !== CACHE).map(k => caches.delete(k))))
+      .then(() => self.clients.claim())
+  );
+});
+
+/** Network-first: si hay red usamos la versión fresca; si no, la cacheada. */
+self.addEventListener('fetch', ev => {
+  if (ev.request.method !== 'GET') return;
+
+  ev.respondWith(
+    fetch(ev.request)
+      .then(res => {
+        const copia = res.clone();
+        caches.open(CACHE).then(c => c.put(ev.request, copia)).catch(() => {});
+        return res;
+      })
+      .catch(() => caches.match(ev.request).then(r => r || caches.match('./index.html')))
+  );
+});
+
+/** Click en la notificación o en uno de sus botones. */
+self.addEventListener('notificationclick', ev => {
+  const accion = ev.action || 'abrir';
+  const dosisId = (ev.notification.data || {}).dosisId;
+  ev.notification.close();
+
+  ev.waitUntil(
+    self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then(clientes => {
+      // Con la app abierta: le pasamos la acción y la enfocamos.
+      for (const c of clientes) {
+        c.postMessage({ accion, dosisId });
+        if ('focus' in c) return c.focus();
+      }
+      // Cerrada: la abrimos.
+      if (self.clients.openWindow) return self.clients.openWindow('./');
+    })
+  );
+});
+
+/**
+ * Listener de Web Push. Hoy no se dispara porque en local no hay servidor de
+ * push; queda cableado para el despliegue.
+ */
+self.addEventListener('push', ev => {
+  let datos = { titulo: '💊 PillTime', cuerpo: 'Tienes una toma pendiente.' };
+  try { datos = { ...datos, ...ev.data.json() }; } catch (e) { /* payload vacío */ }
+
+  ev.waitUntil(
+    self.registration.showNotification(datos.titulo, {
+      body: datos.cuerpo,
+      tag: datos.tag || 'pilltime-push',
+      renotify: true,
+      requireInteraction: true,
+      icon: './icon.svg',
+      badge: './icon.svg',
+      vibrate: [300, 120, 300, 120, 300],
+      data: datos,
+      actions: [
+        { action: 'tomada', title: '✓ Ya la tomé' },
+        { action: 'posponer', title: '⏱ Posponer' }
+      ]
+    })
+  );
+});

@@ -1,0 +1,284 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#0f766e">
+  <title>PillTime · Recordatorio de pastillas</title>
+  <link rel="manifest" href="manifest.json">
+  <link rel="icon" href="icon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="icon.svg">
+  <link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+
+  <!-- ══════════ Pantalla de acceso ══════════ -->
+  <section id="login" class="login">
+    <div class="login__card">
+      <div class="login__logo">💊</div>
+      <h1>PillTime</h1>
+      <p class="login__sub">Nunca olvides una toma.</p>
+
+      <label class="field">
+        <span>Tu correo electrónico</span>
+        <input type="email" id="loginEmail" placeholder="nombre@correo.com" autocomplete="email">
+      </label>
+
+      <button class="btn btn--primary btn--block" id="loginBtn">Entrar</button>
+      <p class="login__hint" id="loginHint">
+        Solo pueden entrar los correos autorizados.
+      </p>
+    </div>
+  </section>
+
+
+  <!-- ══════════ Aplicación ══════════ -->
+  <div id="app" class="app" hidden>
+
+    <header class="topbar">
+      <div class="topbar__brand">
+        <span class="topbar__logo">💊</span>
+        <span class="topbar__name">PillTime</span>
+      </div>
+      <div class="topbar__right">
+        <button class="iconbtn" id="notifBtn" title="Activar notificaciones">🔔</button>
+        <button class="chip" id="userChip" title="Cerrar sesión"></button>
+      </div>
+    </header>
+
+    <main class="main">
+
+      <!-- ── Vista: Hoy ── -->
+      <section class="view" data-view="hoy">
+        <div class="view__head">
+          <div>
+            <h2 id="hoyTitulo">Hoy</h2>
+            <p class="muted" id="hoyFecha"></p>
+          </div>
+          <div class="ring" id="adherenciaRing">
+            <span id="adherenciaPct">0%</span>
+          </div>
+        </div>
+
+        <div id="proximaDosis" class="next" hidden></div>
+        <div id="listaHoy" class="doses"></div>
+      </section>
+
+      <!-- ── Vista: Medicamentos ── -->
+      <section class="view" data-view="meds" hidden>
+        <div class="view__head">
+          <h2>Mis medicamentos</h2>
+          <button class="btn btn--primary btn--sm" id="nuevoMedBtn">+ Nuevo</button>
+        </div>
+        <div id="listaMeds" class="meds"></div>
+      </section>
+
+      <!-- ── Vista: Historial ── -->
+      <section class="view" data-view="historial" hidden>
+        <div class="view__head"><h2>Historial</h2></div>
+        <div class="stats" id="statsHistorial"></div>
+        <div id="listaHistorial" class="history"></div>
+      </section>
+
+      <!-- ── Vista: Ajustes ── -->
+      <section class="view" data-view="ajustes" hidden>
+        <div class="view__head"><h2>Ajustes</h2></div>
+
+        <div class="card">
+          <h3>Recordatorios</h3>
+          <label class="field field--row">
+            <span>Repetir aviso cada</span>
+            <select id="cfgIntervalo">
+              <option value="1">1 minuto (pruebas)</option>
+              <option value="3">3 minutos</option>
+              <option value="5" selected>5 minutos</option>
+              <option value="10">10 minutos</option>
+              <option value="15">15 minutos</option>
+            </select>
+          </label>
+          <label class="field field--row">
+            <span>Avisar antes de la hora</span>
+            <select id="cfgAvisoPrevio">
+              <option value="0" selected>A la hora exacta</option>
+              <option value="5">5 minutos antes</option>
+              <option value="10">10 minutos antes</option>
+              <option value="15">15 minutos antes</option>
+            </select>
+          </label>
+          <label class="field field--row">
+            <span>Dejar de insistir después de</span>
+            <select id="cfgMaxRecordatorios">
+              <option value="6">6 avisos</option>
+              <option value="12" selected>12 avisos</option>
+              <option value="24">24 avisos</option>
+              <option value="999">Nunca parar</option>
+            </select>
+          </label>
+          <label class="field field--row">
+            <span>Sonido de alarma</span>
+            <input type="checkbox" id="cfgSonido" checked>
+          </label>
+          <label class="field field--row">
+            <span>Escalar a email si no marco</span>
+            <select id="cfgEscalarEmail">
+              <option value="0">Nunca</option>
+              <option value="15" selected>A los 15 minutos</option>
+              <option value="30">A los 30 minutos</option>
+              <option value="60">A la hora</option>
+            </select>
+          </label>
+          <p class="muted small">
+            El email solo se dispara si pasaron los minutos indicados sin marcar la toma.
+            Así el inbox recibe lo mínimo indispensable.
+          </p>
+        </div>
+
+        <div class="card">
+          <h3>Usuarios autorizados</h3>
+          <p class="muted small">Solo estos correos pueden entrar. Equivale a la hoja <code>Usuarios</code>.</p>
+          <div id="listaUsuarios" class="users"></div>
+          <div class="field field--row">
+            <input type="email" id="nuevoUsuarioEmail" placeholder="correo@ejemplo.com">
+            <button class="btn btn--sm" id="agregarUsuarioBtn">Autorizar</button>
+          </div>
+        </div>
+
+        <div class="card">
+          <h3>Datos</h3>
+          <p class="muted small">Exporta en el mismo formato que tendrán las hojas de Google Sheets.</p>
+          <div class="btnrow">
+            <button class="btn btn--sm" data-export="medicamentos">Medicamentos.csv</button>
+            <button class="btn btn--sm" data-export="dosis">Dosis.csv</button>
+            <button class="btn btn--sm" data-export="usuarios">Usuarios.csv</button>
+          </div>
+          <div class="btnrow">
+            <button class="btn btn--sm btn--ghost" id="seedBtn">Cargar datos de ejemplo</button>
+            <button class="btn btn--sm btn--danger" id="resetBtn">Borrar todo</button>
+          </div>
+        </div>
+
+        <div class="card">
+          <h3>Diagnóstico</h3>
+          <dl class="diag" id="diagnostico"></dl>
+          <button class="btn btn--sm btn--ghost" id="testNotifBtn">Probar notificación</button>
+        </div>
+      </section>
+
+    </main>
+
+    <nav class="tabbar">
+      <button class="tab is-active" data-goto="hoy"><span>📅</span>Hoy</button>
+      <button class="tab" data-goto="meds"><span>💊</span>Medicamentos</button>
+      <button class="tab" data-goto="historial"><span>📊</span>Historial</button>
+      <button class="tab" data-goto="ajustes"><span>⚙️</span>Ajustes</button>
+    </nav>
+  </div>
+
+
+  <!-- ══════════ Modal: alta / edición de medicamento ══════════ -->
+  <div class="modal" id="medModal" hidden>
+    <div class="modal__backdrop" data-close-modal></div>
+    <div class="modal__box">
+      <header class="modal__head">
+        <h3 id="medModalTitulo">Nuevo medicamento</h3>
+        <button class="iconbtn" data-close-modal>✕</button>
+      </header>
+
+      <form id="medForm" class="modal__body">
+        <input type="hidden" id="medId">
+
+        <label class="field">
+          <span>Nombre del medicamento *</span>
+          <input type="text" id="medNombre" required placeholder="Ej. Paracetamol" autocomplete="off">
+        </label>
+
+        <div class="grid2">
+          <label class="field">
+            <span>Dosis</span>
+            <input type="text" id="medDosis" placeholder="Ej. 500">
+          </label>
+          <label class="field">
+            <span>Unidad</span>
+            <select id="medUnidad">
+              <option value="mg">mg</option>
+              <option value="ml">ml</option>
+              <option value="tableta">tableta(s)</option>
+              <option value="cápsula">cápsula(s)</option>
+              <option value="gota">gota(s)</option>
+              <option value="unidad">unidad(es)</option>
+            </select>
+          </label>
+        </div>
+
+        <label class="field">
+          <span>¿Cuántas veces al día la tomas? *</span>
+          <select id="medVeces" required>
+            <option value="1">1 vez al día</option>
+            <option value="2">2 veces al día</option>
+            <option value="3">3 veces al día</option>
+            <option value="4">4 veces al día</option>
+            <option value="5">5 veces al día</option>
+            <option value="6">6 veces al día</option>
+            <option value="8">8 veces al día</option>
+          </select>
+        </label>
+
+        <div class="field">
+          <span>¿A qué horas? *</span>
+          <div id="horariosWrap" class="horarios"></div>
+          <button type="button" class="btn btn--sm btn--ghost" id="autoHorariosBtn">
+            Distribuir automáticamente
+          </button>
+        </div>
+
+        <div class="grid2">
+          <label class="field">
+            <span>Inicia</span>
+            <input type="date" id="medInicio">
+          </label>
+          <label class="field">
+            <span>Termina (opcional)</span>
+            <input type="date" id="medFin">
+          </label>
+        </div>
+
+        <label class="field">
+          <span>Notas</span>
+          <input type="text" id="medNotas" placeholder="Ej. Tomar con alimentos">
+        </label>
+
+        <footer class="modal__foot">
+          <button type="button" class="btn btn--ghost" data-close-modal>Cancelar</button>
+          <button type="submit" class="btn btn--primary">Guardar</button>
+        </footer>
+      </form>
+    </div>
+  </div>
+
+
+  <!-- ══════════ Alarma a pantalla completa ══════════ -->
+  <div class="alarm" id="alarmOverlay" hidden>
+    <div class="alarm__inner">
+      <div class="alarm__pulse">💊</div>
+      <p class="alarm__kicker" id="alarmKicker">Es hora de tu medicamento</p>
+      <h2 class="alarm__med" id="alarmMed"></h2>
+      <p class="alarm__dosis" id="alarmDosis"></p>
+      <p class="alarm__hora" id="alarmHora"></p>
+      <p class="alarm__nota" id="alarmNota"></p>
+      <div class="alarm__actions">
+        <button class="btn btn--big btn--primary" id="alarmTomada">✓ Ya la tomé</button>
+        <button class="btn btn--big btn--ghost" id="alarmPosponer">⏱ Posponer 10 min</button>
+        <button class="btn btn--link" id="alarmOmitir">Omitir esta toma</button>
+      </div>
+      <p class="alarm__count" id="alarmCount"></p>
+    </div>
+  </div>
+
+  <div id="toast" class="toast" hidden></div>
+
+  <script src="js/store.js"></script>
+  <script src="js/notify.js"></script>
+  <script src="js/scheduler.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>

@@ -1,0 +1,16 @@
+# macOS
+.DS_Store
+._*
+
+# Editores
+.vscode/
+.idea/
+*.swp
+
+# Nunca subir credenciales de Firebase ni de cuentas de servicio.
+# Esas van en Propiedades del script de Apps Script, no en el repo.
+*service-account*.json
+*firebase-adminsdk*.json
+.env
+.env.*
+secrets.json
