@@ -266,6 +266,69 @@ function prueba8_apiCompleta() {
 /* ───────────────────────────────────────────────────────────── */
 
 /**
+ * DIAGNÓSTICO — ejecútala si las horas no coinciden con lo que registraste.
+ *
+ * Imprime las DOS zonas horarias (la del script y la de la hoja, que son
+ * ajustes distintos) y el valor crudo de cada celda de horarios con su tipo
+ * real. Si las zonas no coinciden, cada hora se desplaza al leerla y aparecen
+ * segundos raros como :03:44, que es la diferencia con la hora solar de Bogotá.
+ */
+function diagnosticarHorarios() {
+  console.log('── Diagnóstico de horas ──');
+  console.log('');
+
+  const zonaScript = Session.getScriptTimeZone();
+  const zonaHoja = libro_().getSpreadsheetTimeZone();
+
+  console.log('Zona del proyecto Apps Script : ' + zonaScript);
+  console.log('Zona de la hoja de cálculo    : ' + zonaHoja);
+
+  if (zonaScript !== zonaHoja) {
+    console.log('');
+    console.log('❌ NO COINCIDEN. Esta es la causa de que las horas salgan corridas.');
+    console.log('   Arréglalo en el Sheet: Archivo → Configuración → Zona horaria,');
+    console.log('   y ponla igual que la del script (' + zonaScript + ').');
+  } else {
+    console.log('✓ Coinciden.');
+  }
+
+  console.log('');
+  console.log('Hora actual según el script: ' + hoyISO_() + ' ' + horaISO_());
+  console.log('');
+  console.log('── Celdas de horarios ──');
+
+  leerHoja_(HOJA.medicamentos).forEach(function (m) {
+    const crudo = m.horarios;
+    const tipo = Object.prototype.toString.call(crudo).replace('[object ', '').replace(']', '');
+    const interpretado = aHorarios_(crudo);
+
+    console.log('');
+    console.log('  ' + m.nombre);
+    console.log('    valor crudo  : ' + String(crudo));
+    console.log('    tipo real    : ' + tipo + (tipo === 'Date' ? '  ← Sheets lo convirtió en hora' : ''));
+    console.log('    interpretado : ' + JSON.stringify(interpretado));
+  });
+
+  console.log('');
+  console.log('── Dosis de hoy (lo que ve la app) ──');
+
+  const hoy = hoyISO_();
+  leerHoja_(HOJA.dosis)
+    .filter(function (d) { return aFecha_(d.fecha) === hoy; })
+    .forEach(function (d) {
+      const crudo = d.hora_programada;
+      const tipo = Object.prototype.toString.call(crudo).replace('[object ', '').replace(']', '');
+      console.log('  ' + aHora_(crudo) + '  estado=' + d.estado +
+                  '  [crudo: ' + String(crudo) + '  tipo: ' + tipo + ']');
+    });
+
+  console.log('');
+  console.log('Si el tipo real dice Date, ejecuta repararHorarios().');
+  console.log('Si dice String y la hora ya está mal, el problema viene del');
+  console.log('formulario y no de la hoja: mándame esta salida completa.');
+}
+
+/**
  * REPARACIÓN — ejecútala una vez si ves fechas de 1899 en la app.
  *
  * Arregla los medicamentos cuyos horarios Google Sheets convirtió en valor de
