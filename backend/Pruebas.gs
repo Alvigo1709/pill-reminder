@@ -341,6 +341,26 @@ function diagnosticarHorarios() {
 function repararHorarios() {
   console.log('── Reparación de horarios ──');
 
+  // Las dos zonas horarias son ajustes independientes. Si no coinciden, cada
+  // valor de hora se desplaza al leerlo y ninguna reparación aguanta: hay que
+  // avisarlo antes de tocar nada.
+  const zonaScript = Session.getScriptTimeZone();
+  const zonaHoja = libro_().getSpreadsheetTimeZone();
+
+  if (zonaScript !== zonaHoja) {
+    console.log('');
+    console.log('❌ ALTO. Las zonas horarias no coinciden:');
+    console.log('     proyecto Apps Script : ' + zonaScript);
+    console.log('     hoja de cálculo      : ' + zonaHoja);
+    console.log('');
+    console.log('   Arréglalo PRIMERO en el Sheet: Archivo → Configuración →');
+    console.log('   Zona horaria → ' + zonaScript);
+    console.log('   Luego vuelve a ejecutar esta función.');
+    throw new Error('Zonas horarias distintas: ' + zonaHoja + ' vs ' + zonaScript);
+  }
+
+  console.log('✓ Zonas horarias coinciden: ' + zonaScript);
+
   forzarFormatoTexto_();
   console.log('✓ Columnas de hora y fecha puestas en formato texto');
 
@@ -413,7 +433,31 @@ function repararHorarios() {
   aBorrar.forEach(function (d) { hojaDosis.deleteRow(d._fila); });
 
   console.log('Dosis del historial reparadas: ' + reparadas);
-  console.log('Dosis pendientes borradas (se regeneran): ' + aBorrar.length);
+  console.log('Dosis pendientes borradas por hora inválida: ' + aBorrar.length);
+
+  // Dosis desfasadas: la hora es un texto válido, pero ya no corresponde a
+  // ninguna de las del medicamento. Es lo que deja atrás un desajuste de zona
+  // horaria: parecen sanas y por eso el filtro anterior no las toca.
+  const horasPorMed = {};
+  leerHoja_(HOJA.medicamentos).map(normalizarMedicamento_).forEach(function (m) {
+    horasPorMed[m.id] = m.horarios;
+  });
+
+  const hoy = hoyISO_();
+  const desfasadas = leerHoja_(HOJA.dosis)
+    .map(normalizarDosis_)
+    .filter(function (d) {
+      const esperadas = horasPorMed[d.medicamento_id];
+      return d.estado === 'pendiente'
+          && d.fecha >= hoy
+          && esperadas
+          && esperadas.indexOf(d.hora_programada) === -1;
+    })
+    .sort(function (a, b) { return b._fila - a._fila; });
+
+  desfasadas.forEach(function (d) { hojaDosis.deleteRow(d._fila); });
+  console.log('Dosis pendientes borradas por no coincidir con su medicamento: ' +
+              desfasadas.length);
 
   const creadas = generarDosisDelDia();
   console.log('Dosis regeneradas: ' + creadas);
