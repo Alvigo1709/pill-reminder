@@ -68,9 +68,14 @@ code {
 }
 
 .login__card {
-  width: 100%; max-width: 380px;
+  width: 100%; max-width: 380px; min-width: 0;
   background: #fff; border-radius: 22px; padding: 38px 30px;
   box-shadow: var(--sombra-alta); text-align: center;
+}
+
+@media (max-width: 400px) {
+  .login { padding: 16px; }
+  .login__card { padding: 32px 20px; }
 }
 
 .login__logo { font-size: 3rem; line-height: 1; }

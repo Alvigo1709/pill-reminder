@@ -26,7 +26,7 @@ window.API_URL = 'https://script.google.com/macros/s/AKfycbxHVZfBFDSK7-WFidV1KuV
  *   https://alvigo1709.github.io
  *   http://localhost:8080
  */
-window.CLIENT_ID = 'PEGA_AQUI_TU_CLIENT_ID.apps.googleusercontent.com';
+window.CLIENT_ID = '154074108464-26fga9ti0m62d1hp7luoklrf9o3hc4ct.apps.googleusercontent.com';
 
 /** Cada cuántos segundos el modo remoto vuelve a leer el Sheet. */
 window.REFRESCO_SEGUNDOS = 60;

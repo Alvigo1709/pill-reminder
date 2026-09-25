@@ -58,10 +58,15 @@
         cancel_on_tap_outside: false
       });
 
+      // El botón se renderiza con ancho fijo en píxeles, así que hay que
+      // calcularlo: con un valor duro desborda la tarjeta en pantallas angostas.
+      const disponible = contenedor.clientWidth || contenedor.offsetWidth || 280;
+      const ancho = Math.round(Math.min(360, Math.max(200, disponible)));
+
       google.accounts.id.renderButton(contenedor, {
         theme: 'outline',
         size: 'large',
-        width: 300,
+        width: ancho,
         text: 'signin_with',
         shape: 'pill',
         locale: 'es'
