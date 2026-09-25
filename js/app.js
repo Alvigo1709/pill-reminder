@@ -98,6 +98,36 @@
     }
   }
 
+  /**
+   * Ejecuta la acción que venía en la URL.
+   *
+   * Cuando el usuario pulsa "Ya la tomé" en una notificación con la app
+   * cerrada, el Service Worker no puede marcar la dosis —no tiene el token de
+   * Google— así que abre la app pasando la acción como parámetro. Aquí es
+   * donde de verdad se cumple.
+   */
+  async function ejecutarAccionPendiente() {
+    const params = new URLSearchParams(location.search);
+    const accion = params.get('accion');
+    const dosisId = params.get('dosis');
+    if (!accion || !dosisId) return;
+
+    // Limpia la URL antes de actuar: si recargara, no debe repetirse.
+    history.replaceState(null, '', location.pathname);
+
+    try {
+      if (accion === 'tomada') {
+        await Scheduler.confirmar(dosisId, 'tomada');
+        toast('✓ Toma registrada');
+      } else if (accion === 'posponer') {
+        await Scheduler.posponer(dosisId, 10);
+        toast('⏱ Te aviso en 10 minutos');
+      }
+    } catch (e) {
+      toast('No se pudo registrar la toma: ' + e.message);
+    }
+  }
+
   /* ───────────────── reconexión silenciosa ───────────────── */
 
   let temporizadorRecon = null;
@@ -190,6 +220,14 @@
 
     actualizarBotonNotif();
     prepararInstalacion();
+    await ejecutarAccionPendiente();
+
+    // Los tokens de FCM rotan solos. Si no se revalida en cada arranque, los
+    // avisos dejan de llegar sin que nada falle de forma visible.
+    if (window.PUSH_ACTIVO && window.MODO_REMOTO) {
+      Push.revalidar().catch(e => console.warn('[app] push', e));
+    }
+
     await cargarConfigEnUI();
     await refrescar();
   }
@@ -423,7 +461,13 @@
       default: '⏳ sin solicitar', unsupported: '🚫 no soportado'
     }[perm] || perm;
 
+    const estadoPush = !window.PUSH_ACTIVO
+      ? '⚙️ sin configurar'
+      : (Push.configurado ? '✅ este dispositivo está registrado'
+                          : '⏳ pulsa 🔔 para registrarlo');
+
     $('#diagnostico').innerHTML = `
+      <dt>Avisos con la app cerrada</dt><dd>${estadoPush}</dd>
       <dt>Permiso de notificaciones</dt><dd>${etiquetaPerm}</dd>
       <dt>Service Worker</dt><dd>${'serviceWorker' in navigator
         ? (navigator.serviceWorker.controller ? '✅ activo' : '⏳ registrado, recarga la página')
@@ -656,11 +700,25 @@
 
     $('#notifBtn').addEventListener('click', async () => {
       Notify.desbloquearAudio();
-      const r = await Notify.pedirPermiso();
+
+      // Con push configurado, Push.activar() ya pide el permiso y además
+      // registra el dispositivo en la hoja para recibir avisos con la app
+      // cerrada. Sin él, solo queda el permiso local del navegador.
+      if (window.PUSH_ACTIVO && window.MODO_REMOTO) {
+        try {
+          await Push.activar();
+          toast('🔔 Listo: recibirás avisos aunque cierres la app');
+        } catch (e) {
+          toast(e.message);
+        }
+      } else {
+        const r = await Notify.pedirPermiso();
+        toast(r === 'granted'
+          ? '🔔 Notificaciones activadas mientras la app esté abierta'
+          : 'No se concedió el permiso. Actívalo desde el candado de la barra de direcciones.');
+      }
+
       actualizarBotonNotif();
-      toast(r === 'granted'
-        ? '🔔 Notificaciones activadas'
-        : 'No se concedió el permiso. Actívalo desde el candado de la barra de direcciones.');
       if (vistaActual === 'ajustes') pintarAjustes();
     });
 

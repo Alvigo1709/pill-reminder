@@ -1,17 +1,14 @@
 /**
  * sw.js — Service Worker.
  *
- * Hace dos cosas:
+ * Hace tres cosas:
  *   1. Cachea el app shell para que la PWA abra sin conexión.
- *   2. Atiende los clicks en los botones de la notificación ("Ya la tomé" /
- *      "Posponer") y se los reenvía a la página abierta.
- *
- * Cuando la app se despliegue con Web Push real (vía OneSignal o FCM), aquí
- * se agrega el listener 'push' — el resto de la lógica ya está lista.
+ *   2. Recibe los push de Firebase y dibuja la notificación.
+ *   3. Atiende los clicks en sus botones ("Ya la tomé" / "Posponer").
  */
 
 // Subir este número al cambiar SHELL: fuerza a descartar la caché anterior.
-const CACHE = 'pilltime-v4';
+const CACHE = 'pilltime-v5';
 
 // config.js queda FUERA a propósito: es el archivo que decide si la app habla
 // con el backend o con localStorage. Una versión vieja no rompe nada visible,
@@ -26,6 +23,7 @@ const SHELL = [
   './js/store.js',
   './js/store.remote.js',
   './js/notify.js',
+  './js/push.js',
   './js/scheduler.js',
   './js/app.js',
   './manifest.json',
@@ -87,19 +85,43 @@ self.addEventListener('notificationclick', ev => {
         c.postMessage({ accion, dosisId });
         if ('focus' in c) return c.focus();
       }
-      // Cerrada: la abrimos.
-      if (self.clients.openWindow) return self.clients.openWindow('./');
+
+      // Cerrada. El Service Worker no puede marcar la toma por su cuenta: la
+      // API exige un token de Google que solo existe dentro de la página. Así
+      // que la acción viaja en la URL y la app la ejecuta al abrir.
+      //
+      // Sin esto, pulsar "Ya la tomé" con la app cerrada solo abriría la
+      // ventana y la dosis seguiría pendiente, que es justo lo contrario de
+      // lo que el usuario acaba de indicar.
+      if (!self.clients.openWindow) return;
+
+      const destino = (accion === 'tomada' || accion === 'posponer') && dosisId
+        ? './index.html?accion=' + accion + '&dosis=' + encodeURIComponent(dosisId)
+        : './';
+
+      return self.clients.openWindow(destino);
     })
   );
 });
 
 /**
- * Listener de Web Push. Hoy no se dispara porque en local no hay servidor de
- * push; queda cableado para el despliegue.
+ * Llegada de un push.
+ *
+ * Apps Script manda mensajes SOLO de datos (sin bloque "notification"), a
+ * propósito: si llevaran bloque de notificación, el navegador la mostraría él
+ * mismo, con su formato y sin los botones de "Ya la tomé" y "Posponer". Al ser
+ * solo datos, el control lo tenemos aquí.
+ *
+ * FCM envuelve el contenido dentro de una clave "data", así que hay que
+ * desempaquetarlo antes de usarlo.
  */
 self.addEventListener('push', ev => {
   let datos = { titulo: '💊 PillTime', cuerpo: 'Tienes una toma pendiente.' };
-  try { datos = { ...datos, ...ev.data.json() }; } catch (e) { /* payload vacío */ }
+
+  try {
+    const bruto = ev.data.json();
+    Object.assign(datos, bruto.data || bruto);
+  } catch (e) { /* payload vacío o no-JSON: usamos el texto por defecto */ }
 
   ev.waitUntil(
     self.registration.showNotification(datos.titulo, {

@@ -235,17 +235,9 @@ function enviarEmail_(dosis, med) {
   });
 }
 
-/**
- * Envío de push. Se implementa en la fase 4, con Firebase.
- * Hasta entonces no hace nada y el email es el único canal.
- */
-function enviarPush_(dosis, med) {
-  // Fase 4:
-  //   const usuario = leerUsuario_(dosis.usuario_email);
-  //   if (!usuario || !usuario.push_token) return;
-  //   UrlFetchApp.fetch('https://fcm.googleapis.com/v1/projects/' + PROJECT_ID + '/messages:send', {...});
-  return;
-}
+// enviarPush_() vive en Push.gs. No la declares también aquí: Apps Script
+// comparte un único ámbito global entre archivos, y la última definición que
+// carga gana — un duplicado silenciaría el envío real sin dar ningún error.
 
 function escapar_(s) {
   return String(s === null || s === undefined ? '' : s)
