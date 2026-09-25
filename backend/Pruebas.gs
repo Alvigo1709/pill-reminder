@@ -319,17 +319,38 @@ function repararHorarios() {
     arreglados++;
   });
 
-  // Borra las dosis pendientes con hora inválida; se regeneran limpias.
+  // Dosis con hora corrupta. Hay que tratarlas distinto según su estado:
+  //
+  //   pendientes → se borran y se regeneran limpias.
+  //   el resto   → se reparan EN SITIO. Son historial: si las borro, pierdo
+  //                el registro de que esa toma ocurrió.
   const hojaDosis = hoja_(HOJA.dosis);
-  const basura = leerHoja_(HOJA.dosis)
+  const colHora = encabezados_(HOJA.dosis).indexOf('hora_programada') + 1;
+
+  const corruptas = leerHoja_(HOJA.dosis)
     .map(normalizarDosis_)
-    .filter(function (d) {
-      return d.estado === 'pendiente' && !/^\d{2}:\d{2}$/.test(d.hora_programada);
-    })
+    .filter(function (d) { return !/^\d{2}:\d{2}$/.test(d.hora_programada); });
+
+  var reparadas = 0;
+  corruptas
+    .filter(function (d) { return d.estado !== 'pendiente'; })
+    .forEach(function (d) {
+      const rescatada = (String(d.hora_programada).match(/\d{1,2}:\d{2}/) || [])[0];
+      if (!rescatada) return;
+      hojaDosis.getRange(d._fila, colHora)
+        .setNumberFormat('@')
+        .setValue(('0' + rescatada).slice(-5));
+      reparadas++;
+    });
+
+  const aBorrar = corruptas
+    .filter(function (d) { return d.estado === 'pendiente'; })
     .sort(function (a, b) { return b._fila - a._fila; });
 
-  basura.forEach(function (d) { hojaDosis.deleteRow(d._fila); });
-  console.log('Dosis con hora inválida borradas: ' + basura.length);
+  aBorrar.forEach(function (d) { hojaDosis.deleteRow(d._fila); });
+
+  console.log('Dosis del historial reparadas: ' + reparadas);
+  console.log('Dosis pendientes borradas (se regeneran): ' + aBorrar.length);
 
   const creadas = generarDosisDelDia();
   console.log('Dosis regeneradas: ' + creadas);

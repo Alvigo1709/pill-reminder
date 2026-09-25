@@ -15,11 +15,17 @@
   let vistaActual = 'hoy';
 
   const ESTADOS = {
-    pendiente: { etiqueta: 'Pendiente', clase: 'is-pendiente' },
-    tomada:    { etiqueta: 'Tomada',    clase: 'is-tomada' },
-    omitida:   { etiqueta: 'Omitida',   clase: 'is-omitida' },
-    vencida:   { etiqueta: 'Sin marcar', clase: 'is-vencida' }
+    pendiente: { etiqueta: 'Pendiente',  clase: 'is-pendiente' },
+    tomada:    { etiqueta: 'Tomada',     clase: 'is-tomada' },
+    omitida:   { etiqueta: 'Omitida',    clase: 'is-omitida' },
+    vencida:   { etiqueta: 'Sin marcar', clase: 'is-vencida' },
+    cancelada: { etiqueta: 'Cancelada',  clase: 'is-omitida' }
   };
+
+  /** Nunca devuelve undefined: un estado desconocido no debe romper el render. */
+  function estadoDe(clave) {
+    return ESTADOS[clave] || { etiqueta: String(clave || '—'), clase: 'is-omitida' };
+  }
 
   /* ═══════════════════════ arranque ═══════════════════════ */
 
@@ -203,12 +209,12 @@
     const prox = Scheduler.proxima(dosis);
     const cajaProx = $('#proximaDosis');
     if (prox) {
-      const faltan = Math.round((Fechas.aDate(prox.fecha, prox.hora_programada) - new Date()) / 60000);
+      const faltan = Math.round((Fechas.aDate(prox.fecha, hhmm(prox.hora_programada)) - new Date()) / 60000);
       cajaProx.hidden = false;
       cajaProx.innerHTML = `
         <div class="next__label">Próxima toma</div>
         <div class="next__med">${esc(prox.medicamento.nombre)}</div>
-        <div class="next__time">${prox.hora_programada} · ${textoFaltan(faltan)}</div>`;
+        <div class="next__time">${hhmm(prox.hora_programada)} · ${textoFaltan(faltan)}</div>`;
     } else {
       cajaProx.hidden = true;
     }
@@ -222,14 +228,14 @@
 
     const ahora = new Date();
     cont.innerHTML = dosis.map(d => {
-      const est = ESTADOS[d.estado];
-      const pasada = Fechas.aDate(d.fecha, d.hora_programada) <= ahora;
+      const est = estadoDe(d.estado);
+      const pasada = Fechas.aDate(d.fecha, hhmm(d.hora_programada)) <= ahora;
       const atrasada = d.estado === 'pendiente' && pasada;
 
       return `
         <article class="dose ${est.clase} ${atrasada ? 'is-atrasada' : ''}">
           <div class="dose__time">
-            <strong>${d.hora_programada}</strong>
+            <strong>${hhmm(d.hora_programada)}</strong>
             ${atrasada ? '<span class="dose__late">atrasada</span>' : ''}
           </div>
           <div class="dose__body">
@@ -237,7 +243,7 @@
             <p class="muted">${esc(descripcionDosis(d.medicamento))}</p>
             ${d.medicamento.notas ? `<p class="dose__note">📝 ${esc(d.medicamento.notas)}</p>` : ''}
             ${d.estado === 'tomada' && d.hora_confirmada
-              ? `<p class="dose__ok">✓ Tomada a las ${d.hora_confirmada}</p>` : ''}
+              ? `<p class="dose__ok">✓ Tomada a las ${hhmm(d.hora_confirmada)}</p>` : ''}
             ${d.recordatorios_enviados > 0 && d.estado === 'pendiente'
               ? `<p class="dose__nudges">🔔 ${d.recordatorios_enviados} recordatorio(s) enviado(s)</p>` : ''}
           </div>
@@ -274,7 +280,7 @@
         </div>
         <p class="muted">${esc(descripcionDosis(m))} · ${m.veces_al_dia} ${m.veces_al_dia === 1 ? 'vez' : 'veces'} al día</p>
         <div class="med__horas">
-          ${m.horarios.map(h => `<span class="hora">${h}</span>`).join('')}
+          ${m.horarios.map(h => `<span class="hora">${hhmm(h)}</span>`).join('')}
         </div>
         ${m.notas ? `<p class="med__note">📝 ${esc(m.notas)}</p>` : ''}
         <p class="muted small">
@@ -312,11 +318,11 @@
     cont.innerHTML = Object.keys(porDia).sort().reverse().map(fecha => `
       <div class="day">
         <h4>${etiquetaFecha(fecha)}</h4>
-        ${porDia[fecha].sort((a, b) => a.hora_programada.localeCompare(b.hora_programada)).map(d => `
-          <div class="hrow ${ESTADOS[d.estado].clase}">
-            <span class="hrow__time">${d.hora_programada}</span>
+        ${porDia[fecha].sort((a, b) => hhmm(a.hora_programada).localeCompare(hhmm(b.hora_programada))).map(d => `
+          <div class="hrow ${estadoDe(d.estado).clase}">
+            <span class="hrow__time">${hhmm(d.hora_programada)}</span>
             <span class="hrow__med">${esc(d.medicamento.nombre)}</span>
-            <span class="badge ${ESTADOS[d.estado].clase}">${ESTADOS[d.estado].etiqueta}</span>
+            <span class="badge ${estadoDe(d.estado).clase}">${estadoDe(d.estado).etiqueta}</span>
           </div>`).join('')}
       </div>`).join('');
   }
@@ -374,7 +380,7 @@
       : 'Es hora de tu medicamento';
     $('#alarmMed').textContent = med.nombre;
     $('#alarmDosis').textContent = descripcionDosis(med);
-    $('#alarmHora').textContent = 'Programada para las ' + dosis.hora_programada;
+    $('#alarmHora').textContent = 'Programada para las ' + hhmm(dosis.hora_programada);
     $('#alarmNota').textContent = med.notas ? '📝 ' + med.notas : '';
     $('#alarmCount').textContent = n > 1
       ? `Seguiré avisando cada ${cfg.intervaloRecordatorioMin} min hasta que marques la toma.`
@@ -388,7 +394,7 @@
 
     Notify.enviar({
       titulo: `💊 Hora de ${med.nombre}`,
-      cuerpo: `${descripcionDosis(med)} · programada ${dosis.hora_programada}` +
+      cuerpo: `${descripcionDosis(med)} · programada ${hhmm(dosis.hora_programada)}` +
               (n > 1 ? ` (recordatorio ${n})` : ''),
       tag: 'dosis-' + dosis.id,
       datos: { dosisId: dosis.id }
@@ -695,6 +701,21 @@
   function esc(s) {
     return String(s === undefined || s === null ? '' : s).replace(/[&<>"']/g,
       c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  }
+
+  /**
+   * Cualquier cosa → "HH:MM".
+   *
+   * Red de seguridad para la presentación: si por lo que sea llega una hora
+   * malformada (Google Sheets convierte "16:03" en un Date de 1899 cuando el
+   * medicamento tiene una sola toma), rescatamos la hora en vez de imprimir
+   * un texto de sesenta caracteres que rompe la maquetación.
+   */
+  function hhmm(valor) {
+    const encontrada = String(valor === undefined || valor === null ? '' : valor)
+      .match(/(\d{1,2}):(\d{2})/);
+    if (!encontrada) return '--:--';
+    return ('0' + encontrada[1]).slice(-2) + ':' + encontrada[2];
   }
 
   function descripcionDosis(med) {
