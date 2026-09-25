@@ -197,7 +197,7 @@
     const dosis = await Store.dosisDelDia(usuario.email);
     const cont = $('#listaHoy');
 
-    $('#hoyFecha').textContent = new Date().toLocaleDateString('es-MX', {
+    $('#hoyFecha').textContent = new Date().toLocaleDateString('es-CO', {
       weekday: 'long', day: 'numeric', month: 'long'
     });
 
@@ -738,7 +738,7 @@
 
     if (fecha === hoy) return 'Hoy';
     if (fecha === Fechas.hoyISO(ayer)) return 'Ayer';
-    return Fechas.aDate(fecha, '00:00').toLocaleDateString('es-MX', {
+    return Fechas.aDate(fecha, '00:00').toLocaleDateString('es-CO', {
       weekday: 'long', day: 'numeric', month: 'long'
     });
   }
