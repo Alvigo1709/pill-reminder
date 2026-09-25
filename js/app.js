@@ -455,6 +455,8 @@
         '<p class="muted small">Solo el administrador puede gestionar los accesos.</p>';
     }
 
+    aplicarPermisosDeAjustes();
+
     const perm = Notify.permiso;
     const etiquetaPerm = {
       granted: '✅ concedido', denied: '❌ bloqueado',
@@ -640,6 +642,34 @@
   }
 
   /* ═══════════════════════ ajustes ═══════════════════════ */
+
+  /**
+   * Ajusta la pantalla de Ajustes al rol.
+   *
+   * El backend ya rechaza estas operaciones a quien no sea admin, así que esto
+   * no aporta seguridad: evita enseñar controles que siempre van a fallar. Un
+   * botón que solo devuelve un error se lee como app rota, no como permiso
+   * denegado — y eso con un usuario mayor es peor que no mostrarlo.
+   *
+   * La configuración de recordatorios se deja visible pero bloqueada: saber
+   * cada cuánto va a insistir la app es útil aunque no puedas cambiarlo.
+   */
+  function aplicarPermisosDeAjustes() {
+    const esAdmin = usuario && usuario.rol === 'admin';
+
+    $('#formInvitar').hidden = !esAdmin;
+
+    ['#cfgIntervalo', '#cfgAvisoPrevio', '#cfgMaxRecordatorios', '#cfgEscalarEmail']
+      .forEach(sel => { $(sel).disabled = !esAdmin; });
+
+    // El sonido es preferencia de cada dispositivo, no configuración global.
+    $('#cfgSonido').disabled = false;
+
+    $('#cfgNota').textContent = esAdmin
+      ? 'El email solo se dispara si pasaron los minutos indicados sin marcar ' +
+        'la toma. Así el inbox recibe lo mínimo indispensable.'
+      : 'Estos ajustes los define el administrador. Aquí solo puedes consultarlos.';
+  }
 
   async function cargarConfigEnUI() {
     const cfg = await Store.config();

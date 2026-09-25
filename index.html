@@ -150,7 +150,7 @@
               <option value="60">A la hora</option>
             </select>
           </label>
-          <p class="muted small">
+          <p class="muted small" id="cfgNota">
             El email solo se dispara si pasaron los minutos indicados sin marcar la toma.
             Así el inbox recibe lo mínimo indispensable.
           </p>
@@ -160,7 +160,7 @@
           <h3>Usuarios autorizados</h3>
           <p class="muted small">Solo estos correos pueden entrar. Equivale a la hoja <code>Usuarios</code>.</p>
           <div id="listaUsuarios" class="users"></div>
-          <div class="field field--row">
+          <div class="field field--row" id="formInvitar" hidden>
             <input type="email" id="nuevoUsuarioEmail" placeholder="correo@ejemplo.com">
             <button class="btn btn--sm" id="agregarUsuarioBtn">Autorizar</button>
           </div>
