@@ -39,11 +39,12 @@ window.CLIENT_ID = '154074108464-26fga9ti0m62d1hp7luoklrf9o3hc4ct.apps.googleuse
  * Sale de: Firebase Console → Configuración del proyecto → General → Tus apps.
  */
 window.FIREBASE_CONFIG = {
-  apiKey: 'PEGA_AQUI_apiKey',
-  authDomain: 'PEGA_AQUI_authDomain',
-  projectId: 'PEGA_AQUI_projectId',
-  messagingSenderId: 'PEGA_AQUI_messagingSenderId',
-  appId: 'PEGA_AQUI_appId'
+  apiKey: 'AIzaSyCwW_-SBCYwSsrYoC8PV2k7TJU7356Lh4s',
+  authDomain: 'pill-reminder-2f849.firebaseapp.com',
+  projectId: 'pill-reminder-2f849',
+  storageBucket: 'pill-reminder-2f849.firebasestorage.app',
+  messagingSenderId: '876188966621',
+  appId: '1:876188966621:web:bb57c6c77f1466875c4534'
 };
 
 /**
@@ -51,7 +52,7 @@ window.FIREBASE_CONFIG = {
  * Firebase Console → Configuración del proyecto → Cloud Messaging →
  * Certificados push web → Generar par de claves.
  */
-window.VAPID_KEY = 'PEGA_AQUI_LA_CLAVE_VAPID';
+window.VAPID_KEY = 'BISwhV3b5778dGJdVnW8us9HAa5m7LjkGsLsP-5E8ghjrR75TijBW1KjdoakOQLxv3K9HSGw8LfZielHK31H-lY';
 
 /** true cuando el push está configurado. */
 window.PUSH_ACTIVO = Boolean(window.VAPID_KEY) &&
