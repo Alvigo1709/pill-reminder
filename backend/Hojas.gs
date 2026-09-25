@@ -104,6 +104,31 @@ function aHora_(valor) {
   return m ? ('0' + m[1]).slice(-2) + ':' + m[2] : s;
 }
 
+/**
+ * La celda `horarios` → array de "HH:MM".
+ *
+ * Con varias tomas la celda dice "08:00|15:00|22:00", que Sheets no sabe
+ * interpretar y deja como texto. Pero con UNA sola toma dice "16:03", y eso
+ * Sheets sí lo reconoce: lo convierte en valor de hora y al leerlo devuelve
+ * un Date del 30/12/1899, su fecha de origen.
+ *
+ * Por eso hay que descartar el caso Date ANTES de convertir a texto: si se
+ * hace al revés, el Date se vuelve "Sat Dec 30 1899 16:03:44 GMT..." y ya no
+ * hay forma de reconocerlo como hora.
+ */
+function aHorarios_(valor) {
+  if (valor === '' || valor === null || valor === undefined) return [];
+
+  if (Object.prototype.toString.call(valor) === '[object Date]') {
+    return [aHora_(valor)];
+  }
+
+  return String(valor)
+    .split('|')
+    .map(function (h) { return aHora_(h); })
+    .filter(function (h) { return /^\d{2}:\d{2}$/.test(h); });
+}
+
 /** Cualquier cosa → "YYYY-MM-DD" */
 function aFecha_(valor) {
   if (valor === '' || valor === null || valor === undefined) return '';
@@ -119,6 +144,33 @@ function aBool_(valor) {
   if (valor === false || valor === '' || valor === null) return false;
   const s = String(valor).trim().toUpperCase();
   return s === 'TRUE' || s === 'VERDADERO' || s === 'SI' || s === 'SÍ' || s === '1';
+}
+
+/**
+ * Pone en formato TEXTO las columnas de horas y fechas.
+ *
+ * Es la defensa de raíz contra la conversión automática: si la celda ya está
+ * marcada como texto, Sheets guarda "16:03" tal cual en vez de volverlo un
+ * valor de hora. Se ejecuta desde instalarTriggers() y desde repararHorarios().
+ */
+function forzarFormatoTexto_() {
+  const porHoja = {
+    'Usuarios': ['fecha_alta'],
+    'Medicamentos': ['horarios', 'fecha_inicio', 'fecha_fin', 'dosis'],
+    'Dosis': ['fecha', 'hora_programada', 'hora_confirmada',
+              'ultimo_recordatorio', 'posponer_hasta']
+  };
+
+  Object.keys(porHoja).forEach(function (nombre) {
+    const h = hoja_(nombre);
+    const cols = encabezados_(nombre);
+
+    porHoja[nombre].forEach(function (col) {
+      const j = cols.indexOf(col);
+      if (j === -1) return;
+      h.getRange(1, j + 1, h.getMaxRows(), 1).setNumberFormat('@');
+    });
+  });
 }
 
 function zonaHoraria_() {
@@ -179,10 +231,7 @@ function normalizarMedicamento_(m) {
     dosis: m.dosis === null || m.dosis === undefined ? '' : String(m.dosis),
     unidad: m.unidad || '',
     veces_al_dia: Number(m.veces_al_dia) || 0,
-    horarios: String(m.horarios || '')
-      .split('|')
-      .map(function (h) { return aHora_(h); })
-      .filter(Boolean),
+    horarios: aHorarios_(m.horarios),
     fecha_inicio: aFecha_(m.fecha_inicio),
     fecha_fin: aFecha_(m.fecha_fin),
     notas: m.notas || '',

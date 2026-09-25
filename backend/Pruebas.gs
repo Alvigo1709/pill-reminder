@@ -265,6 +265,80 @@ function prueba8_apiCompleta() {
 
 /* ───────────────────────────────────────────────────────────── */
 
+/**
+ * REPARACIÓN — ejecútala una vez si ves fechas de 1899 en la app.
+ *
+ * Arregla los medicamentos cuyos horarios Google Sheets convirtió en valor de
+ * hora. Pasa cuando el medicamento tiene UNA sola toma al día: la celda dice
+ * "16:03" y Sheets la reconoce como hora en vez de dejarla como texto.
+ *
+ * Reconstruye la hora, la reescribe como texto, borra las dosis pendientes
+ * que quedaron con basura y las vuelve a generar.
+ */
+function repararHorarios() {
+  console.log('── Reparación de horarios ──');
+
+  forzarFormatoTexto_();
+  console.log('✓ Columnas de hora y fecha puestas en formato texto');
+
+  const hojaMed = hoja_(HOJA.medicamentos);
+  const cols = encabezados_(HOJA.medicamentos);
+  const colHorarios = cols.indexOf('horarios') + 1;
+  var arreglados = 0;
+
+  leerHoja_(HOJA.medicamentos).forEach(function (m) {
+    const crudo = m.horarios;
+    const esFecha = Object.prototype.toString.call(crudo) === '[object Date]';
+    const texto = String(crudo || '');
+
+    // Sano: ya son horas separadas por barra.
+    if (!esFecha && /^(\d{1,2}:\d{2})(\|\d{1,2}:\d{2})*$/.test(texto.trim())) return;
+
+    var horas;
+    if (esFecha) {
+      horas = [aHora_(crudo)];
+    } else {
+      // Rescata "16:03" de dentro de "Sat Dec 30 1899 16:03:44 GMT-0456...".
+      horas = (texto.match(/\d{1,2}:\d{2}/g) || []).map(function (h) {
+        return ('0' + h).slice(-5);
+      });
+    }
+
+    if (!horas.length) {
+      console.log('⚠️  "' + m.nombre + '" no tiene horas recuperables: ' + texto);
+      return;
+    }
+
+    hojaMed.getRange(m._fila, colHorarios)
+      .setNumberFormat('@')
+      .setValue(horas.join('|'));
+
+    actualizarFila_(HOJA.medicamentos, m._fila, { veces_al_dia: horas.length });
+
+    console.log('✓ "' + m.nombre + '" → ' + horas.join('|'));
+    arreglados++;
+  });
+
+  // Borra las dosis pendientes con hora inválida; se regeneran limpias.
+  const hojaDosis = hoja_(HOJA.dosis);
+  const basura = leerHoja_(HOJA.dosis)
+    .map(normalizarDosis_)
+    .filter(function (d) {
+      return d.estado === 'pendiente' && !/^\d{2}:\d{2}$/.test(d.hora_programada);
+    })
+    .sort(function (a, b) { return b._fila - a._fila; });
+
+  basura.forEach(function (d) { hojaDosis.deleteRow(d._fila); });
+  console.log('Dosis con hora inválida borradas: ' + basura.length);
+
+  const creadas = generarDosisDelDia();
+  console.log('Dosis regeneradas: ' + creadas);
+
+  console.log('');
+  console.log('RESULTADO: ' + arreglados + ' medicamento(s) reparado(s).');
+  console.log('Zona horaria del script: ' + zonaHoraria_());
+}
+
 function prueba9_limpiar() {
   console.log('── Limpieza de datos de prueba ──');
 

@@ -259,6 +259,8 @@ function escapar_(s) {
  * Es más confiable que crearlos a mano y evita duplicarlos por accidente.
  */
 function instalarTriggers() {
+  forzarFormatoTexto_();   // evita que Sheets convierta "16:03" en valor de hora
+
   // Limpia los que ya existan, para poder re-ejecutar sin acumular.
   ScriptApp.getProjectTriggers().forEach(function (t) {
     const f = t.getHandlerFunction();
