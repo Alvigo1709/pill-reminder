@@ -11,12 +11,17 @@
  */
 
 // Subir este número al cambiar SHELL: fuerza a descartar la caché anterior.
-const CACHE = 'pilltime-v2';
+const CACHE = 'pilltime-v3';
+
+// config.js queda FUERA a propósito: es el archivo que decide si la app habla
+// con el backend o con localStorage. Una versión vieja no rompe nada visible,
+// solo hace que la app se comporte distinto a lo que dice el código — el peor
+// tipo de fallo. GitHub Pages lo sirve con max-age=600, así que además se
+// pide con cache:'no-store' más abajo.
 const SHELL = [
   './',
   './index.html',
   './css/styles.css',
-  './js/config.js',
   './js/auth.js',
   './js/store.js',
   './js/store.remote.js',
@@ -46,6 +51,17 @@ self.addEventListener('activate', ev => {
 /** Network-first: si hay red usamos la versión fresca; si no, la cacheada. */
 self.addEventListener('fetch', ev => {
   if (ev.request.method !== 'GET') return;
+
+  // config.js siempre desde la red, saltándose incluso la caché HTTP del
+  // navegador. Sin esto, tras cambiar API_URL o CLIENT_ID la app seguiría
+  // usando los valores anteriores hasta diez minutos, sin ninguna señal.
+  if (ev.request.url.indexOf('/js/config.js') !== -1) {
+    ev.respondWith(
+      fetch(ev.request, { cache: 'no-store' })
+        .catch(() => caches.match(ev.request))
+    );
+    return;
+  }
 
   ev.respondWith(
     fetch(ev.request)
