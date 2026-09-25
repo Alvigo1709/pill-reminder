@@ -43,7 +43,15 @@
         body: JSON.stringify({ accion: accion, datos: datos || {}, idToken: token })
       });
     } catch (e) {
-      throw new Error('No se pudo conectar con el servidor. Revisa tu conexión.');
+      // Un fetch bloqueado por CORS y uno sin red lanzan el mismo TypeError:
+      // el navegador oculta la diferencia a propósito. Como la causa habitual
+      // es el permiso de la implementación, la nombramos primero.
+      console.error('[api] fetch falló:', e);
+      throw new Error(
+        'No se pudo llamar a la API. Causa más probable: el Web App no está ' +
+        'publicado como "Cualquier usuario" (Implementar → Administrar ' +
+        'implementaciones). Si ya lo está, revisa tu conexión.'
+      );
     }
 
     const texto = await res.text();
