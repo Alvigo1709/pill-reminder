@@ -78,6 +78,9 @@ code {
 .login__hint { font-size: .82rem; color: var(--slate-400); margin-top: 16px; }
 .login__hint.is-error { color: var(--red-600); font-weight: 500; }
 
+/* El botón lo inyecta Google; aquí solo lo centramos. */
+.login__google { display: flex; justify-content: center; min-height: 44px; }
+
 /* ─────────────────── Estructura ─────────────────── */
 
 .app { min-height: 100vh; min-height: 100dvh; padding-bottom: var(--tabbar-h); }

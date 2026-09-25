@@ -19,12 +19,20 @@
       <h1>PillTime</h1>
       <p class="login__sub">Nunca olvides una toma.</p>
 
-      <label class="field">
-        <span>Tu correo electrónico</span>
-        <input type="email" id="loginEmail" placeholder="nombre@correo.com" autocomplete="email">
-      </label>
+      <!-- Modo remoto: identidad por Google -->
+      <div id="loginGoogle" hidden>
+        <div id="googleBtn" class="login__google"></div>
+      </div>
 
-      <button class="btn btn--primary btn--block" id="loginBtn">Entrar</button>
+      <!-- Modo local: sin backend, basta el correo -->
+      <div id="loginLocal">
+        <label class="field">
+          <span>Tu correo electrónico</span>
+          <input type="email" id="loginEmail" placeholder="nombre@correo.com" autocomplete="email">
+        </label>
+        <button class="btn btn--primary btn--block" id="loginBtn">Entrar</button>
+      </div>
+
       <p class="login__hint" id="loginHint">
         Solo pueden entrar los correos autorizados.
       </p>
@@ -276,7 +284,14 @@
 
   <div id="toast" class="toast" hidden></div>
 
+  <!-- Google Identity Services. Solo se usa en modo remoto. -->
+  <script src="https://accounts.google.com/gsi/client" async defer></script>
+
+  <script src="js/config.js"></script>
+  <script src="js/auth.js"></script>
   <script src="js/store.js"></script>
+  <!-- Si config.js define API_URL, este archivo reemplaza a Store. Debe ir después. -->
+  <script src="js/store.remote.js"></script>
   <script src="js/notify.js"></script>
   <script src="js/scheduler.js"></script>
   <script src="js/app.js"></script>

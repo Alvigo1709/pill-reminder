@@ -161,12 +161,14 @@
       return usuario;
     },
 
-    async quitarUsuario(id) {
+    /** Acepta id o correo, para que la UI sirva igual en modo local y remoto. */
+    async quitarUsuario(idOEmail) {
       const db = leer();
-      const usuario = db.usuarios.find(u => u.id === id);
+      const clave = String(idOEmail || '').trim().toLowerCase();
+      const usuario = db.usuarios.find(u => u.id === idOEmail || u.email === clave);
       if (!usuario) return;
       if (usuario.email === db.sesion) throw new Error('No puedes quitarte a ti mismo.');
-      db.usuarios = db.usuarios.filter(u => u.id !== id);
+      db.usuarios = db.usuarios.filter(u => u.id !== usuario.id);
       escribir(db);
     },
 

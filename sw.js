@@ -10,12 +10,16 @@
  * se agrega el listener 'push' — el resto de la lógica ya está lista.
  */
 
-const CACHE = 'pilltime-v1';
+// Subir este número al cambiar SHELL: fuerza a descartar la caché anterior.
+const CACHE = 'pilltime-v2';
 const SHELL = [
   './',
   './index.html',
   './css/styles.css',
+  './js/config.js',
+  './js/auth.js',
   './js/store.js',
+  './js/store.remote.js',
   './js/notify.js',
   './js/scheduler.js',
   './js/app.js',

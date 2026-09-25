@@ -27,16 +27,72 @@
     registrarServiceWorker();
     enlazarEventos();
 
-    const sesion = await Store.sesionActual();
-    if (sesion) {
-      try {
-        usuario = await Store.login(sesion);
-        await entrar();
-      } catch (e) {
-        await Store.logout();
-      }
+    if (window.MODO_REMOTO) {
+      await arrancarRemoto();
+    } else {
+      await arrancarLocal();
     }
   });
+
+  /** Sin backend: la sesión es un correo guardado en localStorage. */
+  async function arrancarLocal() {
+    $('#loginLocal').hidden = false;
+    $('#loginGoogle').hidden = true;
+
+    const sesion = await Store.sesionActual();
+    if (!sesion) return;
+
+    try {
+      usuario = await Store.login(sesion);
+      await entrar();
+    } catch (e) {
+      await Store.logout();
+    }
+  }
+
+  /** Con backend: la identidad la da Google y la valida Apps Script. */
+  async function arrancarRemoto() {
+    $('#loginLocal').hidden = true;
+    $('#loginGoogle').hidden = false;
+
+    try {
+      await esperarGoogle();
+    } catch (e) {
+      return errorLogin('No cargó la librería de Google. Revisa tu conexión.');
+    }
+
+    try {
+      Auth.iniciar($('#googleBtn'), async (perfil) => {
+        try {
+          usuario = await Store.login();
+          await entrar();
+        } catch (err) {
+          Auth.salir();
+          errorLogin(err.message);
+        }
+      });
+    } catch (e) {
+      errorLogin(e.message);
+    }
+  }
+
+  /** La librería de Google carga con `async defer`: hay que esperarla. */
+  function esperarGoogle(msMax) {
+    const limite = Date.now() + (msMax || 8000);
+    return new Promise((resolver, rechazar) => {
+      (function revisar() {
+        if (window.google && google.accounts && google.accounts.id) return resolver();
+        if (Date.now() > limite) return rechazar(new Error('timeout'));
+        setTimeout(revisar, 120);
+      })();
+    });
+  }
+
+  function errorLogin(mensaje) {
+    const hint = $('#loginHint');
+    hint.textContent = mensaje;
+    hint.classList.add('is-error');
+  }
 
   function registrarServiceWorker() {
     if (!('serviceWorker' in navigator)) return;
@@ -100,10 +156,28 @@
 
   async function refrescar() {
     if (!usuario) return;
-    if (vistaActual === 'hoy') await pintarHoy();
-    if (vistaActual === 'meds') await pintarMedicamentos();
-    if (vistaActual === 'historial') await pintarHistorial();
-    if (vistaActual === 'ajustes') await pintarAjustes();
+    try {
+      if (vistaActual === 'hoy') await pintarHoy();
+      if (vistaActual === 'meds') await pintarMedicamentos();
+      if (vistaActual === 'historial') await pintarHistorial();
+      if (vistaActual === 'ajustes') await pintarAjustes();
+    } catch (e) {
+      if (e.sesionExpirada) return volverAlLogin(e.message);
+      toast(e.message);
+    }
+  }
+
+  /**
+   * El ID token de Google dura una hora. Al caducar no podemos seguir
+   * hablando con la API, así que devolvemos al usuario al login en vez de
+   * dejar la pantalla con datos viejos que ya no se pueden guardar.
+   */
+  function volverAlLogin(mensaje) {
+    Scheduler.detener();
+    usuario = null;
+    $('#app').hidden = true;
+    $('#login').hidden = false;
+    errorLogin(mensaje || 'Tu sesión expiró. Vuelve a entrar.');
   }
 
   async function pintarHoy() {
@@ -241,17 +315,30 @@
   }
 
   async function pintarAjustes() {
-    const usuarios = await Store.usuarios();
-    $('#listaUsuarios').innerHTML = usuarios.map(u => `
-      <div class="user">
-        <div>
-          <strong>${esc(u.email)}</strong>
-          <span class="badge ${u.rol === 'admin' ? 'is-admin' : ''}">${u.rol}</span>
-        </div>
-        ${u.email === usuario.email
-          ? '<span class="muted small">tú</span>'
-          : `<button class="iconbtn" data-quitar-usuario="${u.id}" title="Quitar acceso">✕</button>`}
-      </div>`).join('');
+    // La lista de usuarios es solo para el administrador; el backend la rechaza
+    // para los demás, así que ni la pedimos.
+    if (usuario.rol === 'admin') {
+      try {
+        const usuarios = await Store.usuarios();
+        $('#listaUsuarios').innerHTML = usuarios
+          .filter(u => u.activo !== false)
+          .map(u => `
+            <div class="user">
+              <div>
+                <strong>${esc(u.email)}</strong>
+                <span class="badge ${u.rol === 'admin' ? 'is-admin' : ''}">${esc(u.rol)}</span>
+              </div>
+              ${u.email === usuario.email
+                ? '<span class="muted small">tú</span>'
+                : `<button class="iconbtn" data-quitar-usuario="${esc(u.email)}" title="Quitar acceso">✕</button>`}
+            </div>`).join('');
+      } catch (e) {
+        $('#listaUsuarios').innerHTML = `<p class="muted small">No se pudo cargar: ${esc(e.message)}</p>`;
+      }
+    } else {
+      $('#listaUsuarios').innerHTML =
+        '<p class="muted small">Solo el administrador puede gestionar los accesos.</p>';
+    }
 
     const perm = Notify.permiso;
     const etiquetaPerm = {
@@ -462,7 +549,7 @@
       a.download = tabla + '.csv';
       a.click();
       URL.revokeObjectURL(a.href);
-    });
+    }).catch(e => toast(e.message));
   }
 
   async function actualizarBotonNotif() {
@@ -524,16 +611,20 @@
     });
 
     $('#seedBtn').addEventListener('click', async () => {
-      await Store.cargarEjemplo(usuario.email);
-      await Store.generarDosisDelDia(usuario.email);
-      toast('✓ Datos de ejemplo cargados');
-      irA('hoy');
+      try {
+        await Store.cargarEjemplo(usuario.email);
+        await Store.generarDosisDelDia(usuario.email);
+        toast('✓ Datos de ejemplo cargados');
+        irA('hoy');
+      } catch (e) { toast(e.message); }
     });
 
     $('#resetBtn').addEventListener('click', async () => {
       if (!confirm('Esto borra TODOS los datos locales. ¿Continuar?')) return;
-      await Store.borrarTodo();
-      location.reload();
+      try {
+        await Store.borrarTodo();
+        location.reload();
+      } catch (e) { toast(e.message); }
     });
 
     $('#testNotifBtn').addEventListener('click', async () => {
