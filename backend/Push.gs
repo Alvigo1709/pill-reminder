@@ -124,7 +124,17 @@ function base64Url_(texto) {
 function enviarPush_(dosis, med) {
   try {
     const usuario = leerUsuario_(dosis.usuario_email);
-    if (!usuario || !usuario.push_token) return false;   // sin suscripción: queda el email
+
+    if (!usuario) {
+      console.log('[push] no existe el usuario ' + dosis.usuario_email);
+      return false;
+    }
+    if (!usuario.push_token) {
+      // Sin suscripción no hay a dónde enviar; queda el email de respaldo.
+      console.log('[push] ' + usuario.email + ' no tiene push_token. ' +
+                  'Debe pulsar 🔔 en la app desde ese dispositivo.');
+      return false;
+    }
 
     const cuenta = cuentaServicio_();
     const dosisTexto = [med.dosis, med.unidad].filter(Boolean).join(' ');
@@ -161,7 +171,11 @@ function enviarPush_(dosis, med) {
     );
 
     const codigo = res.getResponseCode();
-    if (codigo === 200) return true;
+    if (codigo === 200) {
+      console.log('[push] ✓ enviado a ' + usuario.email + ' · ' + med.nombre +
+                  ' ' + dosis.hora_programada);
+      return true;
+    }
 
     // Token muerto: el usuario borró datos del navegador, reinstaló, o Google
     // lo rotó. Se limpia para no reintentar cada cinco minutos contra la nada.
@@ -184,6 +198,87 @@ function enviarPush_(dosis, med) {
 }
 
 /* ───────────────────── prueba ───────────────────── */
+
+/**
+ * DIAGNÓSTICO — por qué no llega el push con la app cerrada.
+ *
+ * Revisa la cadena completa de una vez: activadores instalados, usuarios
+ * registrados, y qué decidiría el motor AHORA MISMO con cada dosis pendiente.
+ * Así se ve si el problema es el disparador, la suscripción o la regla.
+ */
+function diagnosticarPush() {
+  console.log('── Diagnóstico de notificaciones ──');
+  console.log('');
+
+  /* 1. Activadores */
+  const triggers = ScriptApp.getProjectTriggers();
+  console.log('ACTIVADORES INSTALADOS: ' + triggers.length);
+  triggers.forEach(function (t) {
+    console.log('  · ' + t.getHandlerFunction() + '  (' + t.getEventType() + ')');
+  });
+
+  const tieneCiclo = triggers.some(function (t) {
+    return t.getHandlerFunction() === 'revisarRecordatorios';
+  });
+
+  if (!tieneCiclo) {
+    console.log('');
+    console.log('❌ Falta el activador revisarRecordatorios. Sin él nadie revisa');
+    console.log('   las dosis con la app cerrada. Ejecuta instalarTriggers().');
+  }
+
+  /* 2. Suscripciones */
+  console.log('');
+  console.log('DISPOSITIVOS REGISTRADOS:');
+  leerHoja_(HOJA.usuarios)
+    .filter(function (u) { return aBool_(u.activo); })
+    .forEach(function (u) {
+      const token = String(u.push_token || '');
+      console.log('  · ' + u.email + ' → ' +
+        (token ? '✓ ' + token.slice(0, 22) + '…'
+               : '✗ sin token (debe pulsar 🔔 en SU dispositivo)'));
+    });
+
+  /* 3. Qué pasaría ahora mismo */
+  const cfg = leerConfig_();
+  const ahora = new Date();
+  const hoy = hoyISO_(ahora);
+  const pendientes = leerPendientesDelDia_(hoy);
+
+  console.log('');
+  console.log('CONFIGURACIÓN: repetir cada ' + cfg.intervaloRecordatorioMin +
+              ' min · rendirse tras ' + cfg.maxRecordatorios + ' avisos');
+  console.log('AHORA: ' + hoy + ' ' + horaISO_(ahora) + ' (' + zonaHoraria_() + ')');
+  console.log('');
+  console.log('DOSIS PENDIENTES HOY: ' + pendientes.length);
+
+  pendientes.forEach(function (d) {
+    const dec = evaluar_(d, ahora, cfg);
+    const programada = aDate_(d.fecha, d.hora_programada);
+    const minutos = Math.round((ahora - programada) / 60000);
+
+    console.log('');
+    console.log('  ' + d.hora_programada + '  (' +
+      (minutos >= 0 ? 'hace ' + minutos + ' min' : 'en ' + (-minutos) + ' min') + ')');
+    console.log('    avisos enviados : ' + d.recordatorios_enviados);
+    console.log('    último aviso    : ' + (d.ultimo_recordatorio || '—'));
+    console.log('    pospuesta hasta : ' + (d.posponer_hasta || '—'));
+    console.log('    → avisaría ahora: ' + (dec.avisar ? 'SÍ' : 'no') +
+                (dec.marcarVencida ? '  (se marcaría vencida)' : '') +
+                (dec.escalarEmail ? '  (+ email)' : ''));
+  });
+
+  if (!pendientes.length) {
+    console.log('');
+    console.log('No hay dosis pendientes, así que no habría nada que notificar.');
+    console.log('Registra un medicamento con hora futura y vuelve a probar.');
+  }
+
+  console.log('');
+  console.log('Si "avisaría ahora" dice SÍ pero no llega nada al celular, el');
+  console.log('problema está en la entrega: revisa Ejecuciones para ver si');
+  console.log('[push] ✓ enviado aparece en el registro del ciclo.');
+}
 
 /**
  * Manda una notificación de prueba a tu propio dispositivo.

@@ -116,6 +116,18 @@ function revisarRecordatorios() {
     pendientes.forEach(function (dosis) {
       const decision = evaluar_(dosis, ahora, cfg);
 
+      // Por qué esta dosis no recibe aviso todavía. Sin esto, un ciclo que no
+      // hace nada es indistinguible de un ciclo roto.
+      if (!decision.avisar && !decision.marcarVencida) {
+        const programada = aDate_(dosis.fecha, dosis.hora_programada);
+        const motivo =
+          ahora < programada ? 'aún no es su hora'
+          : (dosis.posponer_hasta && ahora < new Date(dosis.posponer_hasta)) ? 'pospuesta'
+          : 'esperando el intervalo (' + cfg.intervaloRecordatorioMin + ' min desde el último)';
+        console.log('  · ' + dosis.hora_programada + ' ' + motivo +
+                    ' [avisos=' + dosis.recordatorios_enviados + ']');
+      }
+
       if (decision.marcarVencida) {
         actualizarFila_(HOJA.dosis, dosis._fila, { estado: 'vencida' });
         vencidas++;
