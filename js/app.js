@@ -62,7 +62,14 @@
     }
 
     try {
-      Auth.iniciar($('#googleBtn'), async (perfil) => {
+      Auth.iniciar($('#googleBtn'), async (perfil, silencioso) => {
+        // Renovación automática del mismo usuario con la app ya abierta:
+        // solo hay que refrescar datos, no rearrancar toda la pantalla.
+        if (usuario && usuario.email === perfil.email) {
+          try { await refrescar(); } catch (e) { /* el siguiente ciclo reintenta */ }
+          return;
+        }
+
         try {
           usuario = await Store.login();
           await entrar();
